@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  reference-maths:
+    name: Reference maths (Python, checked against pymap3d)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pymap3d pytest
+      - name: Tests
+        working-directory: shared/reference
+        run: python -m pytest -q
+      - name: Fixtures are up to date
+        working-directory: shared/reference
+        run: |
+          python generate_fixtures.py
+          git diff --exit-code ../fixtures
+
+  worker:
+    name: Cloudflare Worker
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend/worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/worker/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npx wrangler deploy --dry-run --outdir dist
+
+  android:
+    name: Android (core + app)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Placeholder endpoints for CI builds
+        run: cp secrets.example.properties secrets.properties
+      - run: ./gradlew :core:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --stacktrace
+
+  ios:
+    name: iOS (core package + app)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Core package tests
+        working-directory: ios/Packages/FlightViewCore
+        run: swift test
+      - name: Generate project
+        working-directory: ios
+        run: |
+          brew install xcodegen
+          cp Config/Secrets.example.xcconfig Config/Secrets.xcconfig
+          xcodegen
+      - name: Build and test app
+        working-directory: ios
+        run: |
+          xcodebuild test -project FlightView.xcodeproj -scheme FlightView \
+            -destination 'platform=iOS Simulator,name=iPhone 16' \
+            CODE_SIGNING_ALLOWED=NO | xcpretty || exit ${PIPESTATUS[0]}
