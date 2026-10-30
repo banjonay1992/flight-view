@@ -8,24 +8,34 @@ There are no paid data services. Aircraft positions come from the raw ADS-B and 
 
 ## How it works
 
-```
- Phone                                   Cloudflare                          Free ADS-B feeds
- ------------------------------          -------------------------------     ------------------
- GPS (snapped to a ~10 km tile) ----->   Worker  /v1/aircraft                ADSB.lol
-                                         - verifies Supabase token    --->   airplanes.live
-                                         - per-user rate limit               adsb.fi
-                                         - 2° regions cached 4 s,            FlyItalyADSB (key)
- <----- aircraft in your circle            your circle cut out        <---   OpenSky Network
-                                         - merges by ICAO address
-                                         - RateGate Durable Object           ADSB One
- Compass + gyro (true north)               keeps each feed within
- Camera FOV                                its published limits
- Dead-reckon each aircraft to "now"
- Project lat/lon/alt onto the screen     Supabase: anonymous auth, logbook (RLS)
+```mermaid
+flowchart LR
+    P["Phone<br/>location snapped to an 11 km tile"]
+    subgraph CF["Cloudflare"]
+        W["Worker /v1/aircraft<br/>JWT check, per-user rate limit,<br/>regional cache, stale-while-revalidate"]
+        G["RateGate Durable Object<br/>per-feed pacing, circuit breaker"]
+    end
+    subgraph WF["Feeds the Worker queries"]
+        L["ADSB.lol"]
+        F["FlyItalyADSB (optional key)"]
+    end
+    subgraph PF["Feeds the phone queries"]
+        FI["adsb.fi"]
+        O["OpenSky Network"]
+    end
+    S[("Supabase<br/>anonymous auth, logbook, RLS")]
 
- The phone also queries adsb.fi and OpenSky directly (they block cloud servers), then merges
- everything by ICAO address: freshest position wins, missing fields are filled in.
+    P -- "tile + access token" --> W
+    W --- G
+    W --> L & F
+    P -- "tile" --> FI & O
+    P <--> S
 ```
+
+Some networks block cloud servers but serve phones, so the work is split: the Worker queries the
+feeds that accept it and caches by region, while each phone also asks adsb.fi and OpenSky directly.
+Everything is merged by ICAO address. The freshest position wins and missing fields are filled in
+from the other reports.
 
 Every frame, each phone:
 
