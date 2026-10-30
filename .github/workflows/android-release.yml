@@ -1,14 +1,9 @@
 name: Android release
 
 # Builds a signed App Bundle and attaches it to a GitHub release, ready for Play.
+# Run by hand from the Actions tab once CI is green on main.
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "android/**"
-      - "shared/**"
-      - ".github/workflows/android-release.yml"
 
 concurrency:
   group: android-release
@@ -24,8 +19,10 @@ jobs:
       run:
         working-directory: android
     env:
-      # Public values only: the Supabase publishable key is designed to ship inside apps (RLS protects data).
-      FV_SUPABASE_URL: https://hpxolqagnxbgotilkicg.supabase.co
+      # Public client configuration only. Supabase publishable keys are designed to ship inside
+      # apps (row level security protects the data), so it is not a secret. Real secrets come
+      # from `secrets.*` below and never appear in the repository.
+      FV_SUPABASE_URL: ${{ vars.FV_SUPABASE_URL }}
       FV_SUPABASE_ANON_KEY: sb_publishable_7shxjc-8Hkkgy-aKIpEAVA_Dh6Hv2ZM
       FV_API_BASE_URL: ${{ vars.FV_API_BASE_URL }}
     steps:
@@ -38,10 +35,11 @@ jobs:
 
       - name: Check configuration
         run: |
-          if [ -z "$FV_API_BASE_URL" ]; then
-            echo "::error::Repository variable FV_API_BASE_URL (the Worker URL) is not set"
-            exit 1
-          fi
+          missing=0
+          for v in FV_API_BASE_URL FV_SUPABASE_URL; do
+            if [ -z "${!v}" ]; then echo "::error::Repository variable $v is not set"; missing=1; fi
+          done
+          exit $missing
 
       - name: Unpack upload key
         env:
