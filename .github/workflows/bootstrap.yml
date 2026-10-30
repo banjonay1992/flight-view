@@ -1,0 +1,26 @@
+name: Bootstrap source
+
+# One-off: unpacks bootstrap/source.tar.gz into the repository and commits it.
+# (The code was uploaded through the web UI as a single archive.)
+on:
+  push:
+    paths: ["bootstrap/source.tar.gz"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  unpack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unpack and commit
+        run: |
+          tar -xzf bootstrap/source.tar.gz
+          git rm -q bootstrap/source.tar.gz
+          git config user.name "Flight View bootstrap"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Add Flight View source" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+          git push
