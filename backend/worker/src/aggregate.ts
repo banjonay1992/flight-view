@@ -2,7 +2,7 @@ import { mergeAircraft } from "./merge";
 import type { Provider } from "./providers/registry";
 import type { Aircraft, AircraftResponse, AreaQuery, Env, ProviderOutcome } from "./types";
 
-export const UPSTREAM_TIMEOUT_MS = 3500;
+export const UPSTREAM_TIMEOUT_MS = 2500;
 
 export interface Gate {
   acquire(provider: Provider): Promise<boolean>;

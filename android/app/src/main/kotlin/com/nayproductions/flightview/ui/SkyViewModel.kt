@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.nayproductions.flightview.FlightViewApp
 import com.nayproductions.flightview.camera.CameraOptics
 import com.nayproductions.flightview.core.Aircraft
+import com.nayproductions.flightview.core.AircraftMerge
 import com.nayproductions.flightview.core.GeoPoint
 import com.nayproductions.flightview.core.Intrinsics
 import com.nayproductions.flightview.core.LabelLayout
@@ -20,9 +21,12 @@ import com.nayproductions.flightview.core.ScreenSmoother
 import com.nayproductions.flightview.core.SkyMarker
 import com.nayproductions.flightview.core.SkyScene
 import com.nayproductions.flightview.core.Vec3
+import com.nayproductions.flightview.data.AircraftApi
 import com.nayproductions.flightview.data.ApiException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -94,19 +98,25 @@ class SkyViewModel(app: Application) : AndroidViewModel(app) {
 
     private suspend fun poll() {
         val obs = _observer.value ?: run { _status.value = SkyStatus.LOCATING; return }
-        try {
-            val res = c.api.fetch(obs.latDeg, obs.lonDeg)
-            _aircraft.value = res.aircraft.map { it.toCore() }
-            _attribution.value = res.attribution
-            _status.value = SkyStatus.OK
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: ApiException.Busy) {
-            _status.value = SkyStatus.BUSY
-        } catch (e: Exception) {
-            // Keep the last good data; dead reckoning carries it for a while.
-            _status.value = SkyStatus.ERROR
+        val (tileLat, tileLon) = AircraftApi.tileCentre(obs.latDeg, obs.lonDeg)
+        // The Worker and the phone's own feeds run in parallel; whichever answers is used.
+        val (worker, direct) = coroutineScope {
+            val w = async { runCatching { c.api.fetch(obs.latDeg, obs.lonDeg, RADIUS_KM) } }
+            val d = async { runCatching { c.directFeeds.poll(tileLat, tileLon, RADIUS_KM + 10) } }
+            w.await() to d.await()
         }
+        (worker.exceptionOrNull() ?: direct.exceptionOrNull())?.let { if (it is CancellationException) throw it }
+        val workerRes = worker.getOrNull()
+        val (directLists, directAttribution) = direct.getOrNull() ?: (emptyList<List<Aircraft>>() to emptyList())
+        if (workerRes == null && directLists.isEmpty()) {
+            // Keep the last good data; dead reckoning carries it for a while.
+            _status.value = if (worker.exceptionOrNull() is ApiException.Busy) SkyStatus.BUSY else SkyStatus.ERROR
+            return
+        }
+        val lists = listOfNotNull(workerRes?.aircraft?.map { it.toCore() }) + directLists
+        _aircraft.value = AircraftMerge.merge(lists)
+        _attribution.value = ((workerRes?.attribution ?: emptyList()) + directAttribution).distinct()
+        _status.value = SkyStatus.OK
     }
 
     private val nowS get() = System.currentTimeMillis() / 1000.0 + c.api.clockOffsetS
@@ -189,5 +199,6 @@ class SkyViewModel(app: Application) : AndroidViewModel(app) {
     companion object {
         private const val KEY_NUDGE = "headingNudgeDeg"
         private const val POLL_MS = 2_000L
+        private const val RADIUS_KM = 80
     }
 }

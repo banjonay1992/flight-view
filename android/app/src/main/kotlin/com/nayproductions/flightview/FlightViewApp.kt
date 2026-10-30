@@ -2,6 +2,7 @@ package com.nayproductions.flightview
 
 import android.app.Application
 import com.nayproductions.flightview.data.AircraftApi
+import com.nayproductions.flightview.data.DirectFeeds
 import com.nayproductions.flightview.data.Logbook
 import com.nayproductions.flightview.data.Session
 import com.nayproductions.flightview.sensors.LocationSource
@@ -27,6 +28,7 @@ class AppContainer(app: Application) {
 
     val session = Session(BuildConfig.SUPABASE_URL, BuildConfig.SUPABASE_ANON_KEY)
     val api = AircraftApi(BuildConfig.API_BASE_URL, session)
+    val directFeeds = DirectFeeds()
     val logbook = Logbook(session)
     val location = LocationSource(app)
     val orientation = OrientationSensor(app)

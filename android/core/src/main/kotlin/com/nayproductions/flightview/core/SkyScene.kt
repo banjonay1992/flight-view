@@ -24,6 +24,8 @@ data class Aircraft(
     val onGround: Boolean,
     val category: String?,
     val squawk: String?,
+    /** Feeds that reported this aircraft (e.g. "adsblol", "adsbfi"). */
+    val sources: List<String> = emptyList(),
 ) {
     /** Prefer geometric (GNSS, ellipsoidal) height; barometric altitude can differ by hundreds of metres. */
     val bestHeightM: Double? get() = altGeomM ?: altBaroM

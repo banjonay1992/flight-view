@@ -19,6 +19,7 @@ final class SkyViewModel {
 
     private static let nudgeKey = "headingNudgeDeg"
     private static let pollInterval: Duration = .seconds(2)
+    private static let radiusKm = 80.0
 
     @ObservationIgnored private let env: AppEnvironment
     @ObservationIgnored private var pollTask: Task<Void, Never>?
@@ -56,18 +57,38 @@ final class SkyViewModel {
             statusMessage = String(localized: "Finding your location…")
             return
         }
-        do {
-            let res = try await env.api.fetch(latDeg: obs.latDeg, lonDeg: obs.lonDeg)
-            aircraft = res.aircraft
-            attribution = res.attribution
+        let tile = AircraftAPI.tileCentre(latDeg: obs.latDeg, lonDeg: obs.lonDeg)
+        // The Worker and the phone's own feeds run in parallel; whichever answers is used.
+        async let workerResult = fetchWorker(obs)
+        async let direct = env.directFeeds.poll(tileLat: tile.lat, tileLon: tile.lon, radiusKm: Int(Self.radiusKm) + 10)
+        let (worker, feeds) = await (workerResult, direct)
+        if Task.isCancelled { return }
+
+        var lists = feeds.lists
+        var credits = feeds.attribution
+        switch worker {
+        case .success(let res):
+            lists.insert(res.aircraft, at: 0)
+            credits = res.attribution + credits
             clockOffsetS = await env.api.clockOffsetS
-            lastUpdate = .now
-            statusMessage = nil
-        } catch is CancellationError {
-            return
+        case .failure(let error):
+            if lists.isEmpty {
+                // Keep showing the last good data; dead reckoning carries it for a while.
+                statusMessage = error.localizedDescription
+                return
+            }
+        }
+        aircraft = AircraftMerge.merge(lists)
+        attribution = credits.reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
+        lastUpdate = .now
+        statusMessage = nil
+    }
+
+    private func fetchWorker(_ obs: GeoPoint) async -> Result<AircraftResponse, Error> {
+        do {
+            return .success(try await env.api.fetch(latDeg: obs.latDeg, lonDeg: obs.lonDeg, radiusKm: Self.radiusKm))
         } catch {
-            // Keep showing the last good data; dead reckoning carries it for a while.
-            statusMessage = error.localizedDescription
+            return .failure(error)
         }
     }
 

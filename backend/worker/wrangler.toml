@@ -7,9 +7,12 @@ compatibility_flags = ["nodejs_compat"]
 enabled = true
 
 [vars]
-# Every free feed we know of. Drop any you don't want, or set COMMERCIAL_MODE
-# to "true" to automatically drop the ones whose terms forbid commercial use.
-PROVIDERS = "adsblol,airplaneslive,adsbfi,adsbone,flyitaly,opensky"
+# Feeds queried from Cloudflare. adsb.fi and OpenSky block cloud providers, so the apps
+# query those two directly; airplanes.live now requires approval and ADSB One blocks all
+# automated access. Their adapters stay in src/providers for when access is granted.
+# FlyItalyADSB is skipped until FLYITALY_API_KEY is set. COMMERCIAL_MODE = "true" drops
+# feeds whose terms forbid commercial use.
+PROVIDERS = "adsblol,flyitaly"
 COMMERCIAL_MODE = "false"
 REQUIRE_AUTH = "true"
 SUPABASE_URL = "https://hpxolqagnxbgotilkicg.supabase.co"

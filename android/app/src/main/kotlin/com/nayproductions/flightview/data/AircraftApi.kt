@@ -39,7 +39,7 @@ data class ApiAircraft(
 ) {
     fun toCore() = Aircraft(
         id, callsign, registration, typeCode, typeName, operator, latDeg, lonDeg, altGeomM, altBaroM,
-        groundSpeedKt, trackDeg, verticalRateFpm, positionTime, onGround, category, squawk,
+        groundSpeedKt, trackDeg, verticalRateFpm, positionTime, onGround, category, squawk, sources,
     )
 }
 

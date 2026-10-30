@@ -44,4 +44,17 @@ class CoreTest {
         val (x2, _) = s.smooth("a", 600.0, 100.0, 2.0 / 60.0)
         assertEquals(600.0, x2)
     }
+
+    @Test
+    fun `merge keeps the freshest position and fills gaps from other feeds`() {
+        val base = SceneChecks.plane("abc123", 0.2, 0.0, 9000.0).copy(sources = listOf("adsblol"))
+        val newer = base.copy(latDeg = base.latDeg + 0.01, positionTime = base.positionTime + 2, typeCode = null, sources = listOf("adsbfi"))
+        val other = SceneChecks.plane("def456", 0.3, 0.0, 9000.0)
+        val merged = AircraftMerge.merge(listOf(listOf(base, other), listOf(newer)))
+        assertEquals(listOf("abc123", "def456"), merged.map { it.id })
+        val m = merged.first()
+        assertEquals(newer.latDeg, m.latDeg)
+        assertEquals("A320", m.typeCode)
+        assertEquals(listOf("adsbfi", "adsblol"), m.sources)
+    }
 }

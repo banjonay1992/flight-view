@@ -21,16 +21,18 @@ final class AppEnvironment {
     let config: AppConfig
     let session: SessionStore
     let api: AircraftAPI
+    let directFeeds: DirectFeeds
     let location: LocationService
     let motion: MotionService
     let camera: CameraService
     let logbook: LogbookService
 
-    init(config: AppConfig, session: SessionStore, api: AircraftAPI, location: LocationService,
+    init(config: AppConfig, session: SessionStore, api: AircraftAPI, directFeeds: DirectFeeds, location: LocationService,
          motion: MotionService, camera: CameraService, logbook: LogbookService) {
         self.config = config
         self.session = session
         self.api = api
+        self.directFeeds = directFeeds
         self.location = location
         self.motion = motion
         self.camera = camera
@@ -44,6 +46,7 @@ final class AppEnvironment {
             config: config,
             session: session,
             api: AircraftAPI(baseURL: config.apiBaseURL, session: session),
+            directFeeds: DirectFeeds(),
             location: LocationService(),
             motion: MotionService(),
             camera: CameraService(),

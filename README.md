@@ -4,7 +4,7 @@ Point your phone at a plane and see what it is.
 
 Flight View shows the live camera feed with a small label over every aircraft in view: callsign, altitude and distance. Tap one for the airline, aircraft type, registration, speed and heading, and save it to your logbook. It runs natively on iOS (SwiftUI) and Android (Kotlin and Jetpack Compose), with a Cloudflare Worker and Supabase behind it.
 
-There are no paid data services. Aircraft positions come from the raw ADS-B and MLAT signals picked up by thousands of volunteer receivers around the world, merged from every free feed we could find so coverage is as wide as possible.
+There are no paid data services. Aircraft positions come from the raw ADS-B and MLAT signals picked up by thousands of volunteer receivers around the world. The Worker and the phone each query the free feeds they can reach (some networks block cloud servers but serve phones), and the results are merged by aircraft so coverage is as wide as possible.
 
 ## How it works
 
@@ -22,6 +22,9 @@ There are no paid data services. Aircraft positions come from the raw ADS-B and 
  Camera FOV                                its published limits
  Dead-reckon each aircraft to "now"
  Project lat/lon/alt onto the screen     Supabase: anonymous auth, logbook (RLS)
+
+ The phone also queries adsb.fi and OpenSky directly (they block cloud servers), then merges
+ everything by ICAO address: freshest position wins, missing fields are filled in.
 ```
 
 Every frame, each phone:
@@ -68,7 +71,7 @@ npx wrangler secret put OPENSKY_CLIENT_SECRET
 npm run deploy
 ```
 
-Feeds without credentials are skipped automatically. ADSB.lol, airplanes.live, adsb.fi and ADSB One need no key.
+Feeds without credentials are skipped automatically. Deploys also run automatically from `main` through Cloudflare Workers Builds.
 
 ### 3. iOS
 
@@ -94,7 +97,7 @@ cp secrets.example.properties secrets.properties   # fill in the three values
 
 ```bash
 (cd shared/reference && python -m pytest -q)          # reference vs pymap3d, 10 tests
-(cd backend/worker && npm test)                        # parsing, merging, privacy tiling, fan-out, 17 tests
+(cd backend/worker && npm test)                        # parsing, merging, privacy tiling, fan-out
 (cd ios/Packages/FlightViewCore && swift test)         # Swift core vs golden fixtures + scene tests
 (cd android && ./gradlew :core:test :app:testDebugUnitTest)
 ```
@@ -105,10 +108,18 @@ CI runs all four on every push (`.github/workflows/ci.yml`), and fails if the fi
 
 See [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md). In short: ADSB.lol (ODbL) and FlyItalyADSB (CC BY-SA) allow commercial use with attribution. airplanes.live, adsb.fi, ADSB One and OpenSky are free for non-commercial use. Setting `COMMERCIAL_MODE = "true"` in `wrangler.toml` drops the non-commercial feeds in one line. Attribution for whichever feeds answered is returned with every response and shown in the app.
 
+## Security
+
+- No secrets live in the repository. The Android upload key is a GitHub Actions secret (`ANDROID_SIGNING`), Worker keys are Cloudflare secrets, and local builds read `android/secrets.properties` and `ios/Config/Secrets.xcconfig`, both git-ignored with committed `.example` templates.
+- The only Supabase key in the apps is the publishable key, which is designed to ship in clients. Every table has Row Level Security, so it grants nothing beyond the signed-in user's own rows.
+- The Worker verifies Supabase access tokens against the project's public JWKS (asymmetric ES256 keys), rate-limits per user, and never logs coordinates.
+- Google Play App Signing holds the app signing key; the upload key used by CI can be reset if it is ever exposed.
+- Dependabot keeps dependencies current. See [SECURITY.md](SECURITY.md) to report a vulnerability.
+
 ## Privacy
 
 - The camera feed never leaves the phone.
-- Before any request is made, the phone snaps its location to the centre of a 0.1 degree grid tile (about 11 km). The Worker snaps it again, and never logs coordinates.
+- Before any request is made, the phone snaps its location to the centre of a 0.1 degree grid tile (about 11 km). The Worker snaps it again, and never logs coordinates. The two feeds the phone queries directly (adsb.fi and OpenSky) receive the same coarse tile and can see the IP address of the phone.
 - Accounts are anonymous Supabase users. The logbook stores the tile, not the position. Row Level Security limits every query to the owner.
 - No analytics, no tracking, no third-party SDKs beyond Supabase. The iOS privacy manifest declares exactly this.
 

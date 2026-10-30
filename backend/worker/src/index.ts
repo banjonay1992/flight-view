@@ -9,7 +9,7 @@ export { RateGate } from "./rateGate";
 
 /** Live data is shared per region for this long. Aircraft move ~1 km in 4 s; the apps dead-reckon the gap. */
 const FRESH_TTL_S = 4;
-/** If every provider is busy or down, serve the last good answer for the region for up to this long. */
+/** Last good answer per region, served instantly while a refresh runs (and when every feed is down). */
 const STALE_TTL_S = 90;
 
 const SECURITY_HEADERS: Record<string, string> = {
@@ -72,7 +72,7 @@ export default {
     const freshKey = new Request(`https://cache.flightview.internal/fresh/${key}`);
     const staleKey = new Request(`https://cache.flightview.internal/stale/${key}`);
 
-    const respond = (regional: AircraftResponse, state: "HIT" | "MISS" | "STALE") =>
+    const respond = (regional: AircraftResponse, state: "HIT" | "MISS" | "STALE" | "REVALIDATING") =>
       json(
         { ...regional, area, aircraft: withinArea(regional.aircraft, area) } satisfies AircraftResponse,
         200,
@@ -82,23 +82,31 @@ export default {
     const hit = await cache.match(freshKey);
     if (hit) return respond(await hit.json(), "HIT");
 
-    const providers = enabledProviders(env);
-    const result = await aggregate(region, providers, env, durableGate(env));
-    const anyOk = result.providers.some((p) => p.status === "ok");
-
-    if (!anyOk) {
-      const stale = await cache.match(staleKey);
-      if (stale) return respond(await stale.json(), "STALE");
-      if (result.providers.every((p) => p.status === "skipped")) {
-        return problem(503, "Busy", "All live feeds are rate limited for this area. Retry in a second.");
+    /** Query the feeds for the region and, if any answered, cache the result. */
+    const refresh = async (): Promise<AircraftResponse> => {
+      const result = await aggregate(region, enabledProviders(env), env, durableGate(env));
+      if (result.providers.some((p) => p.status === "ok")) {
+        const body = JSON.stringify(result);
+        const store = (ttl: number) =>
+          new Response(body, { headers: { "Content-Type": "application/json", "Cache-Control": `public, max-age=${ttl}` } });
+        await Promise.all([cache.put(freshKey, store(FRESH_TTL_S)), cache.put(staleKey, store(STALE_TTL_S))]);
       }
-      return problem(502, "Upstream unavailable", "No live aircraft feed responded.");
+      return result;
+    };
+
+    // Stale-while-revalidate: if we have a recent answer, return it now and refresh in the
+    // background. The apps dead-reckon every aircraft forward, so a few seconds of age is invisible.
+    const stale = await cache.match(staleKey);
+    if (stale) {
+      ctx.waitUntil(refresh().catch(() => undefined));
+      return respond(await stale.json(), "REVALIDATING");
     }
 
-    const body = JSON.stringify(result);
-    const store = (ttl: number) =>
-      new Response(body, { headers: { "Content-Type": "application/json", "Cache-Control": `public, max-age=${ttl}` } });
-    ctx.waitUntil(Promise.all([cache.put(freshKey, store(FRESH_TTL_S)), cache.put(staleKey, store(STALE_TTL_S))]));
-    return respond(result, "MISS");
+    const result = await refresh();
+    if (result.providers.some((p) => p.status === "ok")) return respond(result, "MISS");
+    if (result.providers.every((p) => p.status === "skipped")) {
+      return problem(503, "Busy", "All live feeds are rate limited for this area. Retry in a second.");
+    }
+    return problem(502, "Upstream unavailable", "No live aircraft feed responded.");
   },
 } satisfies ExportedHandler<Env>;

@@ -33,3 +33,9 @@ backend/worker/.wrangler/
 # Python
 __pycache__/
 .pytest_cache/
+
+# Signing material must never be committed
+signing/
+*.p12
+*.jks
+*.keystore
