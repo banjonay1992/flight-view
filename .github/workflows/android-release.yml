@@ -30,7 +30,7 @@ jobs:
       FV_API_BASE_URL: ${{ vars.FV_API_BASE_URL }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: 17
