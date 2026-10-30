@@ -1,0 +1,35 @@
+# macOS / editors
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Secrets (examples are committed)
+ios/Config/Secrets.xcconfig
+android/secrets.properties
+backend/worker/.dev.vars
+.env*
+
+# iOS
+ios/FlightView.xcodeproj/
+ios/FlightView/Resources/Info.plist
+ios/Packages/*/.build/
+ios/Packages/*/.swiftpm/
+DerivedData/
+*.xcuserstate
+
+# Android
+android/.gradle/
+android/build/
+android/*/build/
+android/local.properties
+*.apk
+*.aab
+
+# Node / Worker
+node_modules/
+backend/worker/.wrangler/
+
+# Python
+__pycache__/
+.pytest_cache/

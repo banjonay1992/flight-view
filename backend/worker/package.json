@@ -1,0 +1,27 @@
+{
+  "name": "flightview-api",
+  "version": "1.0.0",
+  "description": "Flight View aircraft API: merges free ADS-B feeds",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc -p .",
+    "test": "vitest run"
+  },
+  "author": "NAY Productions",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "jose": "^5.10.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260702.1",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.9",
+    "wrangler": "^3.114.17"
+  },
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  }
+}

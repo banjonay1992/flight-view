@@ -1,0 +1,37 @@
+name = "flightview-api"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+[vars]
+# Every free feed we know of. Drop any you don't want, or set COMMERCIAL_MODE
+# to "true" to automatically drop the ones whose terms forbid commercial use.
+PROVIDERS = "adsblol,airplaneslive,adsbfi,adsbone,flyitaly,opensky"
+COMMERCIAL_MODE = "false"
+REQUIRE_AUTH = "true"
+SUPABASE_URL = "https://hpxolqagnxbgotilkicg.supabase.co"
+# Free feeds ask callers to identify themselves.
+USER_AGENT = "FlightView/1.0 (NAY Productions; Flight View plane-spotting app)"
+
+# Secrets (wrangler secret put ...):
+#   FLYITALY_API_KEY        free key from flyitalyadsb.com (commercial use allowed)
+#   OPENSKY_CLIENT_ID       free OpenSky account API client
+#   OPENSKY_CLIENT_SECRET
+
+[[durable_objects.bindings]]
+name = "RATE_GATE"
+class_name = "RateGate"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RateGate"]
+
+# Per-user (or per-IP) limit: the apps poll every 2 s, so 60 per minute leaves headroom.
+[[unsafe.bindings]]
+name = "USER_RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 60, period = 60 }

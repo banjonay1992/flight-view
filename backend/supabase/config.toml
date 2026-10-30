@@ -1,0 +1,29 @@
+# Local development config for `supabase start`. Only settings Flight View relies on are listed.
+project_id = "flight-view"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 17
+
+[auth]
+enabled = true
+site_url = "flightview://auth-callback"
+additional_redirect_urls = ["flightview://auth-callback"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+# Every install gets an anonymous account on first launch; users can link an email later.
+enable_anonymous_sign_ins = true
+enable_signup = true
+
+[auth.rate_limit]
+anonymous_users = 30
+
+[auth.email]
+enable_signup = true
+enable_confirmations = true
