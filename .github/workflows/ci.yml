@@ -61,7 +61,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v5
       - name: Placeholder endpoints for CI builds
         run: cp secrets.example.properties secrets.properties
       - run: ./gradlew :core:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --stacktrace
