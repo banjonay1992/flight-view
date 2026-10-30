@@ -13,6 +13,11 @@ concurrency:
 permissions:
   contents: read
 
+# Explicit bash turns on pipefail, so a failing command piped into a formatter still fails the job.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   reference-maths:
     name: Reference maths (Python, checked against pymap3d)
@@ -86,4 +91,4 @@ jobs:
         run: |
           xcodebuild test -project FlightView.xcodeproj -scheme FlightView \
             -destination 'platform=iOS Simulator,name=iPhone 16' \
-            CODE_SIGNING_ALLOWED=NO | xcpretty || exit ${PIPESTATUS[0]}
+            CODE_SIGNING_ALLOWED=NO | xcpretty
