@@ -1,5 +1,6 @@
 @preconcurrency import AVFoundation
 import Observation
+import SwiftUI
 import UIKit
 
 /// Rear wide camera preview. Exposes the field of view and stream aspect so the overlay's
