@@ -26,7 +26,7 @@ jobs:
       FV_SUPABASE_ANON_KEY: sb_publishable_7shxjc-8Hkkgy-aKIpEAVA_Dh6Hv2ZM
       FV_API_BASE_URL: ${{ vars.FV_API_BASE_URL }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
